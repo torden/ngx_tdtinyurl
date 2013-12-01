@@ -1,0 +1,8 @@
+# Author : Torden Cho <ioemen@gmail.com>
+# ngx_mod_tdtinyurl
+_module_name=ngx_http_tdtinyurl_module
+ngx_addon_name=$_module_name
+HTTP_MODULES="$HTTP_MODULES $_module_name"
+NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_addon_dir/$_module_name.c"
+CORE_LIBS="$CORE_LIBS -L /usr/local/hiredis/lib/ -L /usr/local/kyotocabinet/lib/ -lkyotocabinet -lhiredis -lcurl -lz -lm " 
+CORE_INCS="$CORE_INCS -I /usr/local/hiredis/include/hiredis/ -I /usr/local/kyotocabinet/include/"
