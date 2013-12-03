@@ -1,7 +1,10 @@
 /**
- * Torden TinyURL : Nginx module
- * Author : torden <ioemen@gmail.com>
+ * tdtinyurl
+ * similar goo.gl , bit.ly service
+ * @license : GPLv3, http://www.gnu.org/licenses/gpl.html
+ * @author : torden <https://github.com/torden/>
  */
+
 #include <ngx_config.h>
 #include <ngx_core.h>
 #include <ngx_http.h>

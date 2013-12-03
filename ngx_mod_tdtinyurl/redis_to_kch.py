@@ -1,8 +1,11 @@
 #!/usr/bin/python -O
-# Author : torden <ioemen@gmail.com>
+# tdtinyurl : redis data convert to kyotocabinet sample code
+# @license : GPLv3, http://www.gnu.org/licenses/gpl.html
+# @author : torden <https://github.com/torden/>
 
-#https://github.com/andymccurdy/redis-py/blob/master/redis/client.py
+#redis python module : https://github.com/andymccurdy/redis-py/blob/master/redis/client.py
 import redis
+# kytocabinet python module : http://fallabs.com/kyotocabinet/pythonlegacypkg/
 from kyotocabinet import *
 import sys,time
 

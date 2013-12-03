@@ -1,20 +1,8 @@
 #!/bin/sh
-cd /root/SRC/nginx-1.5.2
+MOD_PATH=`pwd`
+cd /root/SRC/nginx-1.5.7
 gmake clean
-./configure --prefix=/usr/local/nginx/ --with-debug --add-module=./
-#read -p "Continue (y/n)?" choice
-#case "$choice" in 
-#  y|Y ) gmake;;
-#  n|N ) exit;;
-#  * ) exit;;
-#esac
-#read -p "Continue (y/n)?" choice
-#case "$choice" in 
-#  y|Y ) gmake install;;
-#  n|N ) exit;;
-#  * ) exit;;
-#esac
-
+./configure --prefix=/usr/local/nginx/ --with-debug --add-module=$MOD_PATH
 gmake ; gmake install
 killall nginx
 /usr/local/nginx/sbin/nginx

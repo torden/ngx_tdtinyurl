@@ -4,18 +4,18 @@
 
 /* $Id$ */
 
-#ifndef PHP_TINYURL_H
-#define PHP_TINYURL_H
+#ifndef PHP_TDTINYURL_H
+#define PHP_TDTINYURL_H
 
 extern zend_module_entry tdtinyurl_module_entry;
 #define phpext_tdtinyurl_ptr &tdtinyurl_module_entry
 
 #ifdef PHP_WIN32
-#	define PHP_TINYURL_API __declspec(dllexport)
+#	define PHP_TDTINYURL_API __declspec(dllexport)
 #elif defined(__GNUC__) && __GNUC__ >= 4
-#	define PHP_TINYURL_API __attribute__ ((visibility("default")))
+#	define PHP_TDTINYURL_API __attribute__ ((visibility("default")))
 #else
-#	define PHP_TINYURL_API
+#	define PHP_TDTINYURL_API
 #endif
 
 #ifdef ZTS
@@ -42,11 +42,11 @@ extern zend_module_entry tdtinyurl_module_entry;
 
 #define TORDEN_TINYURL_LOGO_IMG_URL "http://torden.tistory.com/attr/file/tdtinyurllogo.gif"
 
-#define PHP_TINYURL_GET_ONLY_KEY 3
-#define PHP_TINYURL_LIVE         7
+#define PHP_TDTINYURL_GET_ONLY_KEY 3
+#define PHP_TDTINYURL_LIVE         7
 
-#define PHP_TINYURL_MODE_SECUER_TUNNELING 1
-#define PHP_TINYURL_MODE_DEFAULT_REDIRECTION 0
+#define PHP_TDTINYURL_MODE_SECUER_TUNNELING 1
+#define PHP_TDTINYURL_MODE_DEFAULT_REDIRECTION 0
 
 #define TORDEN_TINYURL_REDIS_CON_MODE_UDS 1
 #define TORDEN_TINYURL_REDIS_CON_MODE_TCP 2
@@ -78,7 +78,7 @@ ZEND_END_MODULE_GLOBALS(tdtinyurl)
 # define TINYURLG(v) (tdtinyurl_globals.v)
 #endif
 
-#endif	/* PHP_TINYURL_H */
+#endif	/* PHP_TDTINYURL_H */
 
 /*
  * Local variables:
