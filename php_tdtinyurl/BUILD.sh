@@ -1,6 +1,5 @@
 #!/bin/sh
 PHP_HOME="/usr/local/php-fpm/"
-APACHE_LOG_HOME="/usr/local/httpd/logs/"
 gmake clean
 $PHP_HOME/bin/phpize --clean
 $PHP_HOME/bin/phpize
@@ -11,7 +10,6 @@ ldd modules/tdtinyurl.so
 gmake install
 cp -rf tdtinyurl.ini $PHP_HOME/etc/
 killall php-fpm ; $PHP_HOME/sbin/php-fpm
-#tail -f $APACHE_LOG_HOME/error_log
 $PHP_HOME/bin/php ./test.php
 #export USE_ZEND_ALLOC=0
 #export ZEND_DONT_UNLOAD_MODULES=1

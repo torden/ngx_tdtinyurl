@@ -1,6 +1,8 @@
-/*
- * Author: torden <ioemen@gmail.com>
-*/
+/**
+ * tdtinyurl php extension module
+ * @license : GPLv3, http://www.gnu.org/licenses/gpl.html
+ * @author : torden <https://github.com/torden/>
+ */
 /* $Id$ */
 
 #ifdef HAVE_CONFIG_H
@@ -14,11 +16,10 @@
 #include <math.h>
 #include <time.h>
 #include <stdio.h>
-#include "uqid.h"
-#include "hiredis/hiredis.h"
+#include <uqid.h>
+#include <hiredis/hiredis.h>
 #include "php_tdtinyurl.h"
 #include <mcheck.h>
-
 
 ZEND_DECLARE_MODULE_GLOBALS(tdtinyurl)
 
@@ -45,7 +46,7 @@ static short redis_connected = 0;
 
 const zend_function_entry tdtinyurl_functions[] = {
 	PHP_FE(tdtinyurl_set_url,    	arginfo_tdtinyurl_set_url)
-	PHP_FE(tdtinyurl_set_rid,     arginfo_tdtinyurl_set_rid)
+	PHP_FE(tdtinyurl_set_rid,       arginfo_tdtinyurl_set_rid)
 	PHP_FE(tdtinyurl_get_url,    	arginfo_tdtinyurl_get_url)
 	PHP_FE(tdtinyurl_get_rid,    	arginfo_tdtinyurl_get_rid)
 	PHP_FE_END
@@ -68,7 +69,7 @@ zend_module_entry tdtinyurl_module_entry = {
 	STANDARD_MODULE_PROPERTIES
 };
 
-#ifdef COMPILE_DL_TINYURL
+#ifdef COMPILE_DL_TDTINYURL
 ZEND_GET_MODULE(tdtinyurl)
 #endif
 
@@ -96,11 +97,11 @@ PHP_MINIT_FUNCTION(tdtinyurl)
         TINYURLG(enable) = 0;
     } 
 */
-    REGISTER_LONG_CONSTANT("TINYURL_GET_ONLY_KEY", PHP_TINYURL_GET_ONLY_KEY, CONST_CS|CONST_PERSISTENT);
-    REGISTER_LONG_CONSTANT("TINYURL_LIVE", PHP_TINYURL_LIVE, CONST_CS|CONST_PERSISTENT);
+    REGISTER_LONG_CONSTANT("TINYURL_GET_ONLY_KEY", PHP_TDTINYURL_GET_ONLY_KEY, CONST_CS|CONST_PERSISTENT);
+    REGISTER_LONG_CONSTANT("TINYURL_LIVE", PHP_TDTINYURL_LIVE, CONST_CS|CONST_PERSISTENT);
     
-    REGISTER_LONG_CONSTANT("TINYURL_MODE_DEFAULT_REDIRECTION", PHP_TINYURL_MODE_DEFAULT_REDIRECTION, CONST_CS|CONST_PERSISTENT);
-    REGISTER_LONG_CONSTANT("TINYURL_MODE_SECUER_TUNNELING", PHP_TINYURL_MODE_SECUER_TUNNELING, CONST_CS|CONST_PERSISTENT);
+    REGISTER_LONG_CONSTANT("TINYURL_MODE_DEFAULT_REDIRECTION", PHP_TDTINYURL_MODE_DEFAULT_REDIRECTION, CONST_CS|CONST_PERSISTENT);
+    REGISTER_LONG_CONSTANT("TINYURL_MODE_SECUER_TUNNELING", PHP_TDTINYURL_MODE_SECUER_TUNNELING, CONST_CS|CONST_PERSISTENT);
 
 	return SUCCESS;
 }
@@ -208,7 +209,7 @@ PHP_FUNCTION(tdtinyurl_set_url)
     int url_len = 0;
     long int seed_num = 0;
     char *ptdtinyurl_key = NULL;
-    long working_mode = PHP_TINYURL_LIVE;
+    long working_mode = PHP_TDTINYURL_LIVE;
     long action_mode = -1;
     long expire_time_sec = 0;
     char nowtime[12] = {0x00,};
@@ -238,7 +239,7 @@ PHP_FUNCTION(tdtinyurl_set_url)
     }
 
 
-    if(PHP_TINYURL_MODE_DEFAULT_REDIRECTION != action_mode && PHP_TINYURL_MODE_SECUER_TUNNELING != action_mode) {
+    if(PHP_TDTINYURL_MODE_DEFAULT_REDIRECTION != action_mode && PHP_TDTINYURL_MODE_SECUER_TUNNELING != action_mode) {
 
         php_error_docref(NULL TSRMLS_CC, E_WARNING, "second parameteris wrong(%d), please use the TINYURL_MODE_DEFAULT_REDIRECTION or TINYURL_MODE_SECUER_TUNNELING ", action_mode);
         RETURN_FALSE;
@@ -262,7 +263,7 @@ PHP_FUNCTION(tdtinyurl_set_url)
     
     switch(working_mode) {
 
-        case PHP_TINYURL_LIVE:
+        case PHP_TDTINYURL_LIVE:
 
             if(-1 == tiny_url_redis_connect(TINYURLG(redis_connect_mode), TINYURLG(redis_uds_sock_path), TINYURLG(redis_ip), atoi(TINYURLG(redis_port)))) {
 
@@ -325,7 +326,7 @@ PHP_FUNCTION(tdtinyurl_set_url)
             
             break;
 
-        case PHP_TINYURL_GET_ONLY_KEY:
+        case PHP_TDTINYURL_GET_ONLY_KEY:
         default:
             break;
     }
