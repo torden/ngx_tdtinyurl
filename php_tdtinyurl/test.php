@@ -4,7 +4,7 @@
 $sUrl = 'http://www.yahoo.com';
 
 print "\n\n";
-$sKey = tdtinyurl_set_url($sUrl, TINYURL_MODE_SECUER_TUNNELING);
+$sKey = tdtinyurl_set_url($sUrl, TDTINYURL_MODE_SECUER_TUNNELING);
 print 'tdtinyurl_set_url : '. $sKey ."\n";
 
 $sUrl = tdtinyurl_get_url($sKey);

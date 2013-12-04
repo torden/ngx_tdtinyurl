@@ -37,10 +37,10 @@ extern zend_module_entry tdtinyurl_module_entry;
 #define TORDEN_TINYURL_MSG_NOT_ENABLE "tdtinyurl module is not enable"
 #define TORDEN_TINYURL_MSG_SYSTEM_FAILURE "tdtinyurl module is wrong working"
 
-#define TORDEN_TINYURL_DOCS_HOME "http://torden.tistory.com"
-#define TORDEN_TINYURL_DOCS2_HOME "http://torden.tistory.com"
+#define TORDEN_TINYURL_DOCS_HOME "https://bitbucket.org/torden/tdbucket"
+#define TORDEN_TINYURL_DOCS2_HOME "https://bitbucket.org/torden/tdbucket/wiki/Home"
 
-#define TORDEN_TINYURL_LOGO_IMG_URL "http://torden.tistory.com/attr/file/tdtinyurllogo.gif"
+#define TORDEN_TINYURL_LOGO_IMG_URL "https://bitbucket-assetroot.s3.amazonaws.com/c/photos/2013/Dec/04/tdtinyurl-logo-3876131587-6_avatar.png"
 
 #define PHP_TDTINYURL_GET_ONLY_KEY 3
 #define PHP_TDTINYURL_LIVE         7
