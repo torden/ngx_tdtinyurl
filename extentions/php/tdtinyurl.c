@@ -316,7 +316,7 @@ PHP_MINFO_FUNCTION(tdtinyurl)
 {
 	php_info_print_table_start();
 	php_info_print_table_header(2, "tdtinyurl support", "enable");
-    php_info_print_table_row(2, "Development", "torden");
+    php_info_print_table_row(2, "Development", "torden <https://github.com/torden/>");
     php_info_print_table_row(2, "Version", TORDEN_TINYURL_MODULE_VERSION);
     php_info_print_table_row(2, "Main Doc Home", TORDEN_TINYURL_DOCS_HOME);
     php_info_print_table_row(2, "Sub Doc Home", TORDEN_TINYURL_DOCS2_HOME);
