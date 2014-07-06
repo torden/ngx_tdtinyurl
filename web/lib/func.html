@@ -1,0 +1,117 @@
+<?php
+/**
+ * Torden TinyURL
+ *
+ * @license : GPLv3, http://www.gnu.org/licenses/gpl.html
+ * @author : torden <https://github.com/torden/>
+ */
+//Global Variables
+global $oDB;
+global $oRedis;
+
+//make a exception handler
+function set_exception_error_handler($errno, $errstr, $errfile, $errline ) {
+
+	//loding error page
+	if(true == file_exists('errpage/fail.html')) {
+		include_once 'errpage/fail.html';
+	} else {
+		include_once '../errpage/fail.html';
+	}    
+
+	//logging
+	error_log( error_get_last() );
+}
+
+//set self-made exception handler
+//set_error_handler("set_exception_error_handler");
+
+//use only web page.
+function set_error($sMsg, $sIncludePath = '/') {
+
+	//loding error page
+	if(true == file_exists('errpage/fail.html')) {
+		include_once 'errpage/fail.html';
+	} else {
+		include_once '../errpage/fail.html';
+	}    
+
+	//logging
+	if(null != $sMsg && 0 < strlen($sMsg)) {
+		error_log($sMsg);
+	}	
+	exit;
+}
+
+//get a connected redis object
+function &set_connect_sqlite3($cDBPath = null) {
+
+    global $oDB;
+
+	if(null == $cDBPath or 1 > strlen(trim($cDBPath))) {
+		
+		//get sqlite3 db file path of TDTINYURL PHP Extention Setted Enviroment
+		$cDBPath = tdtinyurl_get_sqlite3_db_path();
+	}
+
+	$oDB = new SQLite3($cDBPath, SQLITE3_OPEN_READONLY);
+	return $oDB;
+}
+
+//get result by SQL
+function get_sqlite3_result($sSQL) {
+    
+    global $oDB;
+	
+	if(null == $oDB) {
+		set_error("Not Connected SQLITE3");
+	}
+	return $oDB->query($sSQL)->fetchArray();
+}
+
+
+//get result by SQL
+function set_close_sqlite3() {
+    
+    global $oDB;
+	
+	if(null == $oDB) {
+		set_error("Not Connected SQLITE3");
+	}
+	return $oDB->close();
+}
+
+function &set_connect_redis() {
+    global $oRedis;
+
+	$oRedis = new Redis();
+
+	$oRedis->connect('127.0.0.1');
+	$oRedis->setOption(Redis::OPT_SERIALIZER, Redis::SERIALIZER_NONE); 
+	$oRedis->setOption(Redis::OPT_SCAN, Redis::SCAN_RETRY);
+
+	return $oRedis;
+}
+
+function get_original_url_from_redis($sTinyurl) {
+
+    global $oRedis;
+
+	if(null == $oRedis) {
+		set_error("Not Connected Redis");
+	}
+	
+	return $oRedis->hGet($sTinyurl, 'url');
+}
+
+function set_close_redis() {
+
+    global $oRedis;
+
+	if(null == $oRedis) {
+		set_error("Not Connected Redis");
+	}
+
+	$oRedis->close();
+}
+?>

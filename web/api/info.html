@@ -1,0 +1,175 @@
+<?php
+/**
+ * Torden TinyURL
+ *
+ * @license : GPLv3, http://www.gnu.org/licenses/gpl.html
+ * @author : torden <https://github.com/torden/>
+ */
+include '../lib/define.html';
+
+function get_ok_button($sMsg) {
+	return '<button type="button" id="backtohome" class="btn btn-lg btn-success">'.$sMsg.'</button>';
+}
+
+function get_fail_button($sMsg) {
+	return '<button type="button" id="backtohome" class="btn btn-lg btn-danger">'.$sMsg.'</button>';
+}
+
+$aTdTinyURLKeyList = array(
+						'tdtinyurl.cli_support', 
+						'tdtinyurl.enable', 
+						'tdtinyurl.ignore_warning', 
+						'tdtinyurl.redis_connect_mode', 
+						'tdtinyurl.redis_ip', 
+						'tdtinyurl.redis_port', 
+						'tdtinyurl.redis_uds_sock_path', 
+						'tdtinyurl.sqlite3_db_path', 
+						'tdtinyurl.sqlite3_with_mode_enable', 
+						);
+
+//GET sqlite3 db path in php.ini
+$cDBPath = tdtinyurl_get_sqlite3_db_path();
+//connect to sqlite3 db file
+try {
+	$oDB = new SQLite3($cDBPath, SQLITE3_OPEN_READONLY);
+	$oDB->close();
+	$sTestSQLITE3 = get_ok_button('정상');
+} catch(Exception $e) {
+	$sTestSQLITE3 = get_fail_button('비정상 : '. $e->getMessage());
+}
+
+//connect to redis server.
+$oRedis = new Redis();
+try {
+	$oRedis->connect('127.0.0.1');
+	$oRedis->setOption(Redis::OPT_SERIALIZER, Redis::SERIALIZER_NONE); 
+	$oRedis->setOption(Redis::OPT_SCAN, Redis::SCAN_RETRY);
+	$oRedis->close();
+
+	$sTestREDIS = get_ok_button('정상');
+} catch(RedisException $e) {
+
+	$sTestREDIS = get_fail_button('비정상 : '. $e->getMessage());
+}
+
+
+$aNginxConf = array();
+$aNginxConfMessage = array();
+$aNginxConf['tdtinyurl_work_mode'] = filter_input(INPUT_SERVER, 'tdtinyurl_work_mode');
+$aNginxConf['tdtinyurl_dbm_path'] = filter_input(INPUT_SERVER, 'tdtinyurl_dbm_path');
+
+
+switch($aNginxConf['tdtinyurl_work_mode']) {
+
+	case 'lr':
+		$aNginxConfMessage['tdtinyurl_work_mode'] = 'TinyURL키에 대해서 KyotoCabinet DBM을 먼저 확인후 없거나,읽어들일수 없으며, Redis로 조회를 시도합니다.';
+		break;
+
+	case 'rl':
+	default:
+		$aNginxConfMessage['tdtinyurl_work_mode'] = 'TinyURL키에 대해서 Redis에서 먼저 확인후 없거나,읽어들일수 없으며, KyotoCabinet DBM로 조회를 시도합니다.';
+		break;
+}
+
+$bResult = file_exists($aNginxConf['tdtinyurl_dbm_path']);
+if(false == $bResult) {
+	$aNginxConfMessage['tdtinyurl_dbm_path'] = 'DBM 파일이 존재합니다.';
+} else {
+	$aNginxConfMessage['tdtinyurl_dbm_path'] = 'DBM 파일이 존재하지 않거나, 열수없습니다.';
+}
+
+?>
+<div class="container">
+	<div class="row clearfix">
+		<div class="col-md-12 column">
+			<blockquote>
+				<p>
+					Configuration Information of PHP
+				</p> <medium>tdtinyurl extention</medium>
+			</blockquote>
+			<table class="table">
+				<thead>
+					<tr>
+						<th>
+							Directive
+						</th>
+						<th>
+							Value
+						</th>
+					</tr>
+				</thead>
+				<tbody>
+<?php
+foreach($aTdTinyURLKeyList as $mKey => $mVal) {
+?>
+					<tr>
+						<td>
+							<?php echo $mVal; ?>
+						</td>
+						<td>
+							<?php echo ini_get($mVal); ?>
+						</td>
+					</tr>
+<?php
+}
+?>
+				</tbody>
+			</table>
+			<blockquote>
+				<p>
+					Testing Report of Enviroment
+				</p> <medium>tdtinyurl</medium>
+			</blockquote>
+			<table class="table">
+				<thead>
+					<tr>
+						<th>
+							Item
+						</th>
+						<th>
+							Result
+						</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td>
+							Nginx Working Mode
+						</td>
+						<td>
+						<?php echo $aNginxConfMessage['tdtinyurl_work_mode']; ?>
+						</td>
+					</tr>
+
+					<tr>
+						<td>
+							Connect to Redis
+						</td>
+						<td>
+							<?php echo $sTestREDIS; ?>
+						</td>
+					</tr>
+					<tr>
+						<td>
+							Connect to DB Connect
+						</td>
+						<td>
+							<?php echo $sTestSQLITE3; ?>
+						</td>
+					</tr>
+
+					<tr>
+						<td>
+							Connect to Kytocabinet DB
+						</td>
+						<td>
+						<?php echo  $aNginxConfMessage['tdtinyurl_dbm_path']; ?>
+						</td>
+					</tr>
+
+				</tbody>
+			</table>
+
+		</div>
+	</div>
+</div>

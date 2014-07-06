@@ -1,10 +1,9 @@
 /**
- * tdtinyurl
- * similar goo.gl , bit.ly service
+ * Torden TinyURL
+ *
  * @license : GPLv3, http://www.gnu.org/licenses/gpl.html
  * @author : torden <https://github.com/torden/>
  */
-
 #include <ngx_config.h>
 #include <ngx_core.h>
 #include <ngx_http.h>
@@ -25,43 +24,61 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <libgen.h>
+#include <sqlite3.h>
 
+// CONFIG : enable
 #define NGX_TDTINYURL_OFF     0
 #define NGX_TDTINYURL_ON      1
 #define NGX_TDTINYURL_ALWAYS  2
 
+// CONFIG : Working Mode
 #define NGX_TDTINYURL_WORKING_MODE_LR 1
 #define NGX_TDTINYURL_WORKING_MODE_RL 2
 
+// CONFIG : redis connection mode
 #define NGX_TDTINYURL_REDIS_CON_MODE_UDS 1
 #define NGX_TDTINYURL_REDIS_CON_MODE_TCP 2
 
-#define NGX_TDTINYURL_DEFAULT_REDIS_CON_MODE NGX_TDTINYURL_REDIS_CON_MODE_UDS
-#define NGX_TDTINYURL_DEFAULT_REDIS_UDS_SOCK_PATH "/tmp/redis.sock"
-#define NGX_TDTINYURL_DEFAULT_REDIS_TCP_IP_ADDT "127.0.0.1"
-#define NGX_TDTINYURL_DEFAULT_REDIS_PORT "6378"
+// CONFIG : defailt redis connection options
+#define NGX_TDTINYURL_DEFAULT_REDIS_CON_MODE NGX_TDTINYURL_REDIS_CON_MODE_UDS //UDS
+#define NGX_TDTINYURL_DEFAULT_REDIS_UDS_SOCK_PATH "/tmp/redis.sock" //Socket Path
+#define NGX_TDTINYURL_DEFAULT_REDIS_TCP_IP_ADDT "127.0.0.1" //Localhost
+#define NGX_TDTINYURL_DEFAULT_REDIS_PORT "6378" //Port
 
-#define NGX_TDTINYURL_DEF_BUFSIZE 1024 * 256
-#define NGX_TDTINYURL_CURL_RETBUFSIZE 1024 * 8
-#define NGX_TDTINYURL_COOKIEVAL_SIZE 1024
-#define NGX_TDTINYURL_URI_SIZE 8086
-#define NGX_TDTINYURL_URL_MAX_LEN 2048
+// GLOBAL DEFAULT SIZE
+#define NGX_TDTINYURL_DEF_BUFSIZE 1024 * 256 //256k
+#define NGX_TDTINYURL_CURL_RETBUFSIZE 1024 * 8 //8k
+#define NGX_TDTINYURL_COOKIEVAL_SIZE 1024 //1k
+#define NGX_TDTINYURL_URI_SIZE 8086 //8k , NOT USED
 
+// URL Max Lenth
+// http://www.w3.org/Protocols/rfc2616/rfc2616.html
+#define NGX_TDTINYURL_URL_MAX_LEN 2048 
+
+// TinyURL Key Max Length
 #define NGX_TDTINYURL_KEY_MAX_LEN 128
 
+// GLOBAL return value
 #define NGX_TDTINYURL_RETCODE_OK    7
 #define NGX_TDTINYURL_RETCODE_ALLOW 7
 #define NGX_TDTINYURL_RETCODE_DENY 4
 
+// HTTP User-Agent String
 #define NGX_TDTINYURL_NAME "tdtinyurl"
 #define NGX_TDTINYURL_VERSION "0.1"
 #define NGX_TDTINYURL_AGENT NGX_TDTINYURL_NAME "/" NGX_TDTINYURL_VERSION
 
+// Redirection HTML
 #define NGX_TINYUTL_REDIRECT_BOXY_FIRST_TEMPL "<html><head><title>" NGX_TDTINYURL_NAME "</title></head><body><a href='"
 #define NGX_TINYUTL_REDIRECT_BOXY_LAST_TEMPL "'>moved here</a></body></html>"
 
+// fprintf macro
 #define _DEBUGPRINT(...) { fprintf(stderr, "\t(%s:%d in %s): ", __FUNCTION__, __LINE__,__FILE__); fprintf(stderr, __VA_ARGS__); fflush(stderr); }
 
+// SQLite SQL Query
+#define NGX_TINYURL_SQL_UPDATE_TDTINYURL_HITS "UPDATE TDTINYURL SET hits = hits+1 WHERE tinyurl = '%s'"
+#define NGX_TINYURL_SQL_INSET_TDTINYURL_LOG "INSERT INTO TDTINYURL_LOG (tinyurl,agent,ipaddr, referer) VALUES('%s', '%s', '%s', '%s')"
 
 typedef struct {
     ngx_uint_t  enable;
@@ -72,6 +89,8 @@ typedef struct {
     u_char      *work_mode;
     ngx_uint_t  work_mode_no;
     u_char      *dbm_path;
+	ngx_uint_t  sqlite3_with_mode;
+	u_char		*sqlite3_db_path;
 } ngx_http_tdtinyurl_conf_t;
 
 struct string {
@@ -88,6 +107,7 @@ static char *ngx_http_conf_set_redis_uds_path(ngx_conf_t *cf, ngx_command_t *cmd
 static char *ngx_http_conf_set_redis_ip_addr(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static char *ngx_http_conf_set_tdtinyurl_work_mode(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static char *ngx_http_conf_set_tdtinyurl_dbm_path(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+static char *ngx_http_conf_set_tdtinyurl_sqlite3_db_path(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static unsigned short ngx_http_tdtinyurl_check_vaild_ipaddr(u_char *ipaddr);
 static int ngx_http_tdtinyurl_get_last_chr(u_char *pstr, unsigned int findchr);
 static ngx_int_t ngx_http_tdtinyurl_redirection(ngx_http_request_t *r, u_char *predirecturl);
@@ -100,6 +120,13 @@ static ngx_int_t ngx_http_tdtinyurl_dbm_handler(ngx_http_request_t *r, ngx_http_
 static ngx_int_t ngx_http_tdtinyurl_curl_client(ngx_http_request_t *r, const char *pcallurl, char *ppostdata, struct string *pcurlretbuf);
 static ngx_int_t ngx_http_tdtinyurl_oldmalloc_to_ngxpool(ngx_http_request_t *r, struct string *pstr );
 
+int ngx_http_tdtinyurl_mkpath(char *s);
+int ngx_http_tdtinyurl_sqlite3_connect(ngx_log_t *log, sqlite3 **pdb, const char *ppath);
+int ngx_http_tdtinyurl_sqlite3_close(ngx_log_t *log, sqlite3 *pdb);
+int ngx_http_tdtinyurl_sqlite3_quick_exec(ngx_log_t *log, const char *ppath, const char *psql);
+int ngx_http_tdtinyurl_sqlite3_quick_exists_table(ngx_log_t *log, const char *ppath, const char *ptablename);
+
+//conf : tdtinyurl_enable
 static ngx_conf_enum_t  ngx_tdtinyurl_enable_bounds[] = {
     { ngx_string("off"),        NGX_TDTINYURL_OFF },
     { ngx_string("on"),         NGX_TDTINYURL_ON },
@@ -107,16 +134,26 @@ static ngx_conf_enum_t  ngx_tdtinyurl_enable_bounds[] = {
     { ngx_null_string, 0 }
 };
 
+//conf : tdtinyurl_redis_connect_mode
 static ngx_conf_enum_t ngx_http_tdtinyurl_redis_connnect_mode[] = {
     { ngx_string("uds"),   NGX_TDTINYURL_REDIS_CON_MODE_UDS},
     { ngx_string("tcp"),   NGX_TDTINYURL_REDIS_CON_MODE_TCP},
     { ngx_null_string, 0 }
 };
 
+//conf : tdtinyurl_redis_port
 static ngx_conf_num_bounds_t  ngx_http_tdtinyurl_redis_port_bounds = {
     ngx_conf_check_num_bounds, 1, USHRT_MAX
 };
 
+//conf : tdtinyurl_sqlite3_with_mode
+static ngx_conf_enum_t  ngx_tdtinyurl_sqlite3_with_mode_bounds[] = {
+    { ngx_string("off"),        NGX_TDTINYURL_OFF },
+    { ngx_string("on"),         NGX_TDTINYURL_ON },
+    { ngx_null_string, 0 }
+};
+
+//init. tdtinyurl config directive
 static ngx_command_t  ngx_http_tdtinyurl_commands[] = {
 
     { ngx_string("tdtinyurl"),
@@ -168,9 +205,24 @@ static ngx_command_t  ngx_http_tdtinyurl_commands[] = {
         offsetof(ngx_http_tdtinyurl_conf_t, redis_port),
         &ngx_http_tdtinyurl_redis_port_bounds },
 
+    { ngx_string("tdtinyurl_sqlite3_with_mode"),
+        NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
+        ngx_conf_set_enum_slot,
+        NGX_HTTP_LOC_CONF_OFFSET,
+        offsetof(ngx_http_tdtinyurl_conf_t, sqlite3_with_mode),
+        &ngx_tdtinyurl_sqlite3_with_mode_bounds },
+
+    { ngx_string("tdtinyurl_sqlite3_db_path"),
+        NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+        ngx_http_conf_set_tdtinyurl_sqlite3_db_path,
+        NGX_HTTP_LOC_CONF_OFFSET,
+        0,
+        NULL },
+
     ngx_null_command
 };
 
+//reg. config handler
 static ngx_http_module_t  ngx_http_tdtinyurl_module_ctx = {
     NULL, /* preconfiguration */
     ngx_http_tdtinyurl_init, /* postconfiguration */
@@ -185,6 +237,7 @@ static ngx_http_module_t  ngx_http_tdtinyurl_module_ctx = {
     ngx_http_tdtinyurl_merge_conf     /* merge location configuration */
 };
 
+//reg. hook
 ngx_module_t  ngx_http_tdtinyurl_module = {
     NGX_MODULE_V1,
     &ngx_http_tdtinyurl_module_ctx,       /* module context */
@@ -200,6 +253,7 @@ ngx_module_t  ngx_http_tdtinyurl_module = {
     NGX_MODULE_V1_PADDING
 };
 
+//set redis uds path to ngx_http_tdtinyurl_conf_t.redis_uds_path
 static char *ngx_http_conf_set_redis_uds_path(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
 
     ngx_http_tdtinyurl_conf_t  *loc_cf = conf;
@@ -228,6 +282,7 @@ static char *ngx_http_conf_set_redis_uds_path(ngx_conf_t *cf, ngx_command_t *cmd
     return NGX_CONF_OK;
 }
 
+//set redis connectt ip address to ngx_http_tdtinyurl_conf_t.redis_ip_addr
 static char *ngx_http_conf_set_redis_ip_addr(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
 
     ngx_http_tdtinyurl_conf_t  *loc_cf = conf;
@@ -255,7 +310,7 @@ static char *ngx_http_conf_set_redis_ip_addr(ngx_conf_t *cf, ngx_command_t *cmd,
     return NGX_CONF_OK;
 }
 
-
+//set tdtinyurl working mode to ngx_http_tdtinyurl_conf_t.work_mode
 static char *ngx_http_conf_set_tdtinyurl_work_mode(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
 
     ngx_http_tdtinyurl_conf_t  *loc_cf = conf;
@@ -295,12 +350,17 @@ static char *ngx_http_conf_set_tdtinyurl_work_mode(ngx_conf_t *cf, ngx_command_t
     return NGX_CONF_OK;
 }
 
+//set kyotocabinet dbm path to ngx_http_tdtinyurl_conf_t.dbm_path
 static char *ngx_http_conf_set_tdtinyurl_dbm_path(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
 
     ngx_http_tdtinyurl_conf_t  *loc_cf = conf;
     ngx_str_t   *conf_val;
+    KCDB *dbm_dummy = kcdbnew();
     KCDB *dbm = kcdbnew();
     int32_t retval = 0;
+    int mkpath_retval = 0;
+    char *dbm_path;
+    char *dbm_file_path;
 
     if(NULL != loc_cf->dbm_path) {
         return "is duplicated";
@@ -315,7 +375,33 @@ static char *ngx_http_conf_set_tdtinyurl_dbm_path(ngx_conf_t *cf, ngx_command_t 
     if(0 != access((const char *)conf_val[1].data, F_OK | R_OK | W_OK)) {
 
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "%s.dbm_path=%s, can not access or not exists dbm file", NGX_TDTINYURL_NAME , conf_val[1].data);
-        return NGX_CONF_ERROR;
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "%s.dbm_path=%s, make a dummy dbm file", NGX_TDTINYURL_NAME , conf_val[1].data);
+
+
+		//make a dummy
+        dbm_file_path = strdup((const char *)conf_val[1].data);
+        dbm_path = dirname(dbm_file_path);
+
+        if(0 != access(dbm_path, F_OK)) {
+            mkpath_retval = ngx_http_tdtinyurl_mkpath(dbm_path);
+            if(0 != mkpath_retval) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "%s.dbm_path=%s, can not mkdir (%d)", NGX_TDTINYURL_NAME , conf_val[1].data, dbm_path);
+            	return NGX_CONF_ERROR;
+            } else {
+               ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "%s.dbm_path=%s, mkdir %s", NGX_TDTINYURL_NAME , conf_val[1].data, dbm_path);
+            }
+        }
+
+		retval = kcdbopen(dbm_dummy, (const char *)conf_val[1].data, KCOWRITER | KCOCREATE | KCOAUTOSYNC);
+    	if(1 != retval) {
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "%s.dbm_path=%s, can not make a dummy dbm file (%s) : %s", NGX_TDTINYURL_NAME , conf_val[1].data, conf_val[1].data, kcdbemsg(dbm_dummy));
+        	return NGX_CONF_ERROR;
+    	}
+
+        if(!kcdbclose(dbm_dummy)) {
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "%s.dbm_path=%s, can not close the dummy dbm file", NGX_TDTINYURL_NAME , conf_val[1].data);
+        	return NGX_CONF_ERROR;
+		}
     }
 
     retval = kcdbopen(dbm, (const char *)conf_val[1].data, KCOREADER);
@@ -333,12 +419,56 @@ static char *ngx_http_conf_set_tdtinyurl_dbm_path(ngx_conf_t *cf, ngx_command_t 
     return NGX_CONF_OK;
 }
 
+//set sqlite3 db file path to ngx_http_tdtinyurl_conf_t.sqlite3_db_path
+static char *ngx_http_conf_set_tdtinyurl_sqlite3_db_path(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
+
+    ngx_http_tdtinyurl_conf_t  *loc_cf = conf;
+    ngx_str_t   *conf_val;
+	const char *ptinyurl_tbname = "TDTINYURL";
+	const char *ptinyurl_tbname_log = "TDTINYURL_LOG";
+
+    if(NULL != loc_cf->sqlite3_db_path) {
+        return "is duplicated";
+    }
+
+    conf_val = cf->args->elts;
+    if(NULL == conf_val) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "%s.sqlite3_db_path is null", NGX_TDTINYURL_NAME);
+        return NGX_CONF_ERROR;
+    }
+
+    if(0 != access((const char *)conf_val[1].data, F_OK | R_OK | W_OK)) {
+
+		ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "%s.sqlite3_db_path=%s, can not access db file", NGX_TDTINYURL_NAME , conf_val[1].data);
+        return NGX_CONF_ERROR;
+    }
+
+
+	if(SQLITE_OK != ngx_http_tdtinyurl_sqlite3_quick_exists_table(cf->log, (const char *)conf_val[1].data, ptinyurl_tbname)) {
+		ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "%s.sqlite3_db_path=%s, not valid db , not found %s table in db", NGX_TDTINYURL_NAME , conf_val[1].data, ptinyurl_tbname);
+        return NGX_CONF_ERROR;
+	}
+
+	if(SQLITE_OK != ngx_http_tdtinyurl_sqlite3_quick_exists_table(cf->log, (const char *)conf_val[1].data, ptinyurl_tbname_log)) {
+		ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "%s.sqlite3_db_path=%s, not valid db , not found %s table in db", NGX_TDTINYURL_NAME , conf_val[1].data, ptinyurl_tbname_log);
+        return NGX_CONF_ERROR;
+	}
+
+    loc_cf->sqlite3_db_path = (u_char *)ngx_pcalloc(cf->pool, 1025);
+
+    ngx_cpystrn(loc_cf->sqlite3_db_path, conf_val[1].data, conf_val[1].len+1);
+
+    return NGX_CONF_OK;
+}
+
+//check ipaddres pattern.
 static unsigned short ngx_http_tdtinyurl_check_vaild_ipaddr(u_char *ipaddr) {
 
     struct sockaddr_in sa;
     return inet_pton(AF_INET, (const char *)ipaddr, &(sa.sin_addr));
 }
 
+//check white space char.
 inline unsigned short ngx_http_tdtinyurl_is_white_space(register char c) {
 
     if(32 < c && 127 != c) {
@@ -348,6 +478,260 @@ inline unsigned short ngx_http_tdtinyurl_is_white_space(register char c) {
     }
 }
 
+//make recusive directory path
+int ngx_http_tdtinyurl_mkpath(char *pPath) { 
+
+    char bufpath[1025];
+    char *pbufpath = bufpath;
+
+    struct stat st;
+    unsigned int i=0;
+    int status=0;
+    unsigned int pPathlen = strlen(pPath);
+    memset(&bufpath, 0x00, 1025);
+
+    umask(0);
+
+    for(;i<pPathlen;i++) {
+        if( '/' == pPath[i] && 0 < i ) {
+
+            if( 0 == lstat(pbufpath, &st) ) {
+                if( !S_ISREG(st.st_mode) && !S_ISDIR(st.st_mode) && !S_ISLNK(st.st_mode) ) {
+                    perror("can not make a path : ");
+                    return -1;
+                } 
+            } else {
+
+                status = mkdir( pbufpath, 0755);
+                if(0 > status) {
+                    if( 0 != stat(pbufpath, &st) ) {
+                        return -1;
+                    }
+                }
+            }
+        }
+        pbufpath[i] = pPath[i];
+    }
+
+    if( '/' != pPath[pPathlen-1]) {
+        status = mkdir( pbufpath, 0755);
+        if(0 > status) {
+            if( 0 != stat(pbufpath, &st) ) {
+                return -1;
+            }
+        }
+    }
+    return 0;
+
+}
+
+//connect to sqlite3 file (open)
+int ngx_http_tdtinyurl_sqlite3_connect(ngx_log_t *log, sqlite3 **pdb, const char *ppath) {
+
+	long flags = SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE;
+	int errcode = 0;
+
+	sqlite3_config(SQLITE_CONFIG_MULTITHREAD);
+	sqlite3_enable_shared_cache(1);
+	sqlite3_initialize();
+
+	errcode = sqlite3_open_v2(ppath, pdb, flags, NULL);
+	if(SQLITE_OK != errcode) {
+
+        ngx_log_error(NGX_LOG_ALERT, log, 0, "can not open sqlite3(%s)", ppath);
+		return errcode;
+	}
+
+	return SQLITE_OK;
+}
+
+//disconnect to sqlite3 file (close)
+int ngx_http_tdtinyurl_sqlite3_close(ngx_log_t *log, sqlite3 *pdb) {
+
+	int errcode = 0;
+
+	errcode = sqlite3_close(pdb);
+	if(SQLITE_OK != errcode) {
+
+        ngx_log_error(NGX_LOG_ALERT, log, 0, "can not close sqlite3 : %s", sqlite3_errmsg(pdb));
+		return errcode;
+	}
+	return SQLITE_OK;
+}
+
+//SQL : incresing hits field of SQLite3 db by tinyurl
+int ngx_http_tdtinyurl_sqlite3_hit_logging(ngx_http_request_t *r, const char *ppath, const char *ptinyurl) {
+
+	sqlite3 *pdb;
+	int retcode = 0;
+	char *perrmsg = NULL;
+	char sqlbuf[501] = {0x00,};
+	char *psqlbuf = sqlbuf;
+	u_char *preferer = NULL;
+	u_char *puser_agent = NULL;
+	u_char *pip_addr = NULL;
+
+	retcode = ngx_http_tdtinyurl_sqlite3_connect(r->connection->log, &(pdb), ppath);
+	if(SQLITE_OK != retcode) {
+
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "can not open sqlite3 : %s", sqlite3_errmsg(pdb));
+		return retcode;
+	}
+
+
+	retcode = sqlite3_exec(pdb, "BEGIN", NULL, NULL, &perrmsg);
+	if(SQLITE_OK != retcode) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "can not start transaction of sqlite3 : %s", sqlite3_errmsg(pdb));
+		return retcode;
+	}
+
+	snprintf(psqlbuf, 500, NGX_TINYURL_SQL_UPDATE_TDTINYURL_HITS, ptinyurl);
+	retcode = sqlite3_exec(pdb, psqlbuf, NULL, NULL, &perrmsg);
+	if(SQLITE_OK != retcode) {
+
+		sqlite3_exec(pdb, "ROLLBACK", NULL, NULL, &perrmsg);
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "can not update hits: %s , %s", sqlite3_errmsg(pdb), psqlbuf);
+		return retcode;
+	}
+
+	//set
+    if(NULL != r->headers_in.referer) {
+		preferer = (u_char *)ngx_pcalloc(r->pool, r->headers_in.referer->value.len+1);
+		ngx_memcpy(preferer, r->headers_in.referer->value.data, r->headers_in.referer->value.len);
+    }
+    if(NULL != r->headers_in.user_agent) {
+		puser_agent = (u_char *)ngx_pcalloc(r->pool, r->headers_in.user_agent->value.len+1);
+		ngx_memcpy(puser_agent, r->headers_in.user_agent->value.data, r->headers_in.user_agent->value.len);
+    }
+    if(NULL != r->connection->addr_text.data) {
+		pip_addr = (u_char *)ngx_pcalloc(r->pool, r->connection->addr_text.len+1);
+		ngx_memcpy(pip_addr, r->connection->addr_text.data, r->connection->addr_text.len);
+    }
+
+	memset(psqlbuf,0x00,500);
+	snprintf(psqlbuf, 500, NGX_TINYURL_SQL_INSET_TDTINYURL_LOG, ptinyurl, (const char *)puser_agent, (const char *)pip_addr, (const char *)preferer);
+	retcode = sqlite3_exec(pdb, psqlbuf, NULL, NULL, &perrmsg);
+	if(SQLITE_OK != retcode) {
+
+		sqlite3_exec(pdb, "ROLLBACK", NULL, NULL, &perrmsg);
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "can not insert log: %s , %s", sqlite3_errmsg(pdb), psqlbuf);
+		return retcode;
+	}
+
+	retcode = sqlite3_exec(pdb, "COMMIT", NULL, NULL, &perrmsg);
+	if(SQLITE_OK != retcode) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "can not commit transaction of sqlite3 : %s", sqlite3_errmsg(pdb));
+		return retcode;
+	}
+
+	retcode = ngx_http_tdtinyurl_sqlite3_close(r->connection->log, pdb);
+	if(SQLITE_OK != retcode) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "can not close sqlite3 : %s", sqlite3_errmsg(pdb));
+		return retcode;
+	}
+
+	ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "complete update hit of %s", ptinyurl);
+	return SQLITE_OK;
+}
+
+//single execution on sqlite3
+int ngx_http_tdtinyurl_sqlite3_quick_exec(ngx_log_t *log, const char *ppath, const char *psql) {
+
+	sqlite3 *pdb;
+	char *perrmsg = NULL;
+	int errcode = 0;
+
+	errcode = ngx_http_tdtinyurl_sqlite3_connect(log, &(pdb), ppath);
+	if(SQLITE_OK != errcode) {
+		return errcode;
+	}
+
+	errcode = sqlite3_exec(pdb, psql, NULL, NULL, &perrmsg);
+	if(SQLITE_OK != errcode) {
+        ngx_log_error(NGX_LOG_ALERT, log, 0, "can not execute %s : %s", psql, sqlite3_errmsg(pdb));
+		sqlite3_free(perrmsg);
+		sqlite3_close(pdb);
+		return errcode;
+	}
+
+	errcode = ngx_http_tdtinyurl_sqlite3_close(log, pdb);
+	if(SQLITE_OK != errcode) {
+		return errcode;
+	}
+
+	return SQLITE_OK;
+}
+
+//check table eixsts in sqlite3 db
+int ngx_http_tdtinyurl_sqlite3_quick_exists_table(ngx_log_t *log, const char *ppath, const char *ptablename) {
+
+	sqlite3 *pdb;
+	char *perrmsg = NULL;
+	int errcode = 0;
+	int sqllen = 0;
+	int retcode = 0;
+	int returnval = 0;
+	sqlite3_stmt *pstmt;
+	char sqlbuf[200] = {0x00,};
+	char *psqlbuf = sqlbuf;
+
+	errcode = ngx_http_tdtinyurl_sqlite3_connect(log, &(pdb), ppath);
+	if(SQLITE_OK != errcode) {
+		return errcode;
+	}
+
+	snprintf(psqlbuf, 200, "SELECT count(*) as cnt FROM SQLITE_MASTER WHERE TYPE='table' AND NAME = '%s'", ptablename);
+	sqllen = strlen(psqlbuf);
+	ngx_log_debug(NGX_LOG_DEBUG_HTTP, log, 0, "SQL : %s", psqlbuf);
+
+	errcode = sqlite3_prepare_v2(pdb, psqlbuf, sqllen, &pstmt, NULL);
+	if(SQLITE_OK != errcode) {
+        ngx_log_error(NGX_LOG_ALERT, log, 0, "can not prepare %s : %s", psqlbuf, sqlite3_errmsg(pdb));
+		sqlite3_free(perrmsg);
+		sqlite3_close(pdb);
+		return errcode;
+	}
+
+	retcode = sqlite3_step(pstmt);
+	switch(retcode) {
+
+		case SQLITE_ROW:
+			if(1 > sqlite3_data_count(pstmt)) {
+
+        		ngx_log_error(NGX_LOG_ALERT, log, 0, "count zero error %s : %s", psqlbuf, sqlite3_errmsg(pdb));
+				returnval = -1;
+			} else {
+				ngx_log_debug(NGX_LOG_DEBUG_HTTP, log, 0, "column of result : %s", sqlite3_column_name(pstmt, 0));
+				ngx_log_debug(NGX_LOG_DEBUG_HTTP, log, 0, "value of result : %s", sqlite3_column_text(pstmt, 0));
+
+				returnval = sqlite3_column_int(pstmt, 0);
+				if(0 < returnval) {
+					returnval = SQLITE_OK;
+				} else {
+					returnval = SQLITE_MISMATCH;
+				}
+			}
+			break;
+		case SQLITE_DONE:
+			returnval = SQLITE_EMPTY;
+			break;
+		default:
+			
+        	ngx_log_error(NGX_LOG_ALERT, log, 0, "can not run step func %s : %s", psqlbuf, sqlite3_errmsg(pdb));
+			sqlite3_free(perrmsg);
+			break;
+	}
+
+	sqlite3_finalize(pstmt);
+	errcode = ngx_http_tdtinyurl_sqlite3_close(log, pdb);
+	if(SQLITE_OK != errcode) {
+		return errcode;
+	}
+
+	return returnval;
+}
+
+//strip whitespace from a string
 void ngx_http_tdtinyurl_str_trim(register char *pStr) {
 
     register char *pStrLeft;
@@ -364,6 +748,7 @@ void ngx_http_tdtinyurl_str_trim(register char *pStr) {
     }
 }
 
+//init(allocation) tdtinyurl.string 
 static ngx_int_t ngx_http_tdtinyurl_init_string(struct string *pstr, unsigned int defSize ) {
 
     pstr->len = defSize;
@@ -375,6 +760,7 @@ static ngx_int_t ngx_http_tdtinyurl_init_string(struct string *pstr, unsigned in
     return NGX_OK;
 }
 
+//destroy tdtinyurl.string
 static void ngx_http_tdtinyurl_destroy_string(struct string *pstr) {
 
     pstr->len = 0;
@@ -398,6 +784,7 @@ static size_t ngx_http_tdtinyurl_writefunc(void *ptr, size_t size, size_t nmemb,
     return size*nmemb;
 }
 
+//convert tdtinyurl.string to ngx pool
 static ngx_int_t ngx_http_tdtinyurl_oldmalloc_to_ngxpool(ngx_http_request_t *r, struct string *pstr ) {
 
     char *pbuf_str = NULL;
@@ -418,6 +805,7 @@ static ngx_int_t ngx_http_tdtinyurl_oldmalloc_to_ngxpool(ngx_http_request_t *r, 
     return NGX_OK;
 }
 
+//check tdtinyurl enable with tdtinyurl related information logging
 static short ngx_http_tdtinyurl_check_enable(ngx_http_request_t *r) {
 
     ngx_http_tdtinyurl_conf_t  *conf;
@@ -430,6 +818,14 @@ static short ngx_http_tdtinyurl_check_enable(ngx_http_request_t *r) {
     ngx_log_debug(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "r->request_line : %s", (const char *)r->request_line.data);
     ngx_log_debug(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "conf->enable : %d", (int)conf->enable);
     ngx_log_debug(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "r->headers_in.user_agent : %s", (const char *)r->headers_in.user_agent->value.data);
+
+	ngx_log_debug(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "r->headers_in.msie : %d", r->headers_in.msie);
+	ngx_log_debug(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "r->headers_in.msie6 : %d", r->headers_in.msie6);
+	ngx_log_debug(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "r->headers_in.gecko : %d", r->headers_in.gecko);
+	ngx_log_debug(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "r->headers_in.chrome : %d", r->headers_in.chrome);
+	ngx_log_debug(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "r->headers_in.safari : %d", r->headers_in.safari);
+	ngx_log_debug(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "r->headers_in.konqueror : %d", r->headers_in.konqueror);
+
 
     if(1 == (int)conf->enable) { 
         ngx_log_debug(NGX_LOG_DEBUG_HTTP, r->connection->log, 0, "conf->redis_connnect_mode : %d", (int)conf->redis_connnect_mode);
@@ -449,6 +845,7 @@ static short ngx_http_tdtinyurl_check_enable(ngx_http_request_t *r) {
     return 1;
 }
 
+//HTTP client via curl library
 static ngx_int_t ngx_http_tdtinyurl_curl_client(ngx_http_request_t *r, const char *pcallurl, char *ppostdata, struct string *pcurlretbuf) {
 
 
@@ -501,6 +898,7 @@ static ngx_int_t ngx_http_tdtinyurl_curl_client(ngx_http_request_t *r, const cha
     return NGX_OK;
 }
 
+//fetch mode : web cralwing
 static ngx_int_t ngx_http_tdtinyurl_printfout(ngx_http_request_t *r, struct string *pcurlretbuf, ngx_int_t httpstatus) {
 
     ngx_int_t       rc;
@@ -557,6 +955,7 @@ static ngx_int_t ngx_http_tdtinyurl_printfout(ngx_http_request_t *r, struct stri
     return ngx_http_output_filter(r, &out);
 }
 
+//normal mode : http redirection to target url (long tail url)
 static ngx_int_t ngx_http_tdtinyurl_redirection(ngx_http_request_t *r, u_char *predirecturl) {
 
     //ngx_int_t    rc;
@@ -661,7 +1060,7 @@ static ngx_int_t ngx_http_tdtinyurl_redirection(ngx_http_request_t *r, u_char *p
     return ngx_http_tdtinyurl_printfout(r, pbodybuf, NGX_HTTP_MOVED_PERMANENTLY);
 }
 
-
+//string url : get last char
 static int ngx_http_tdtinyurl_get_last_chr(u_char *pstr, unsigned int findchr) {
 
     register unsigned int chr = 0;
@@ -690,6 +1089,7 @@ static int ngx_http_tdtinyurl_get_last_chr(u_char *pstr, unsigned int findchr) {
     return len+1;
 }
 
+//kyotocabinet dbm handler
 static ngx_int_t ngx_http_tdtinyurl_dbm_handler(ngx_http_request_t *r, ngx_http_tdtinyurl_conf_t *conf, u_char *ptdtinyurl_key, int ptdtinyurl_key_len) {
 
     KCDB *dbm = kcdbnew();
@@ -778,6 +1178,7 @@ static ngx_int_t ngx_http_tdtinyurl_dbm_handler(ngx_http_request_t *r, ngx_http_
     }
 }
 
+//redis handler
 static ngx_int_t ngx_http_tdtinyurl_redis_handler(ngx_http_request_t *r, ngx_http_tdtinyurl_conf_t *conf, u_char *ptdtinyurl_key, int ptdtinyurl_key_len) {
 
     struct timeval timeout;
@@ -954,6 +1355,11 @@ static ngx_int_t ngx_http_tdtinyurl_handler(ngx_http_request_t *r) {
         ngx_pfree(r->pool, ptdtinyurl_key_buf);
     } else {
 
+		//logging to sqlite3
+        ngx_log_error(NGX_LOG_ALERT, r->connection->log, 0, "sqlite3_with_mode working mode : %d", conf->sqlite3_with_mode);
+		if(1 == (int)conf->sqlite3_with_mode) {
+			ngx_http_tdtinyurl_sqlite3_hit_logging(r, (const char *)conf->sqlite3_db_path, (const char *)ptdtinyurl_key);
+		}
 
         ngx_log_error(NGX_LOG_ALERT, r->connection->log, 0, "working mode : %d", conf->work_mode_no);
         switch(conf->work_mode_no) {
@@ -986,6 +1392,7 @@ static ngx_int_t ngx_http_tdtinyurl_handler(ngx_http_request_t *r) {
     return NGX_DECLINED;
 }
 
+//init. tdtinyurl config
 static void *ngx_http_tdtinyurl_create_conf(ngx_conf_t *cf) {
 
     ngx_http_tdtinyurl_conf_t  *conf;
@@ -1003,10 +1410,13 @@ static void *ngx_http_tdtinyurl_create_conf(ngx_conf_t *cf) {
     conf->work_mode             = NULL;
     conf->work_mode_no          = NGX_CONF_UNSET_UINT;
     conf->dbm_path              = NULL;
+	conf->sqlite3_with_mode		= NGX_CONF_UNSET_UINT;
+    conf->sqlite3_db_path		= NULL;
 
     return conf;
 }
 
+//merging config
 static char *ngx_http_tdtinyurl_merge_conf(ngx_conf_t *cf, void *parent, void *child) {
 
     ngx_http_tdtinyurl_conf_t  *prev = parent;
@@ -1018,6 +1428,7 @@ static char *ngx_http_tdtinyurl_merge_conf(ngx_conf_t *cf, void *parent, void *c
     return NGX_CONF_OK;
 }
 
+//ini tdtinyurl ngx module
 static ngx_int_t ngx_http_tdtinyurl_init(ngx_conf_t *cf) {
 
     ngx_http_handler_pt        *h;

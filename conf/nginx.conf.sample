@@ -1,0 +1,73 @@
+user  nobody;
+worker_processes  1;
+
+error_log  logs/error.log debug;
+pid        logs/nginx.pid;
+events {
+    worker_connections  1024;
+}
+
+
+http {
+    include       mime.types;
+    default_type  application/octet-stream;
+
+    log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                      '$status $body_bytes_sent "$http_referer" '
+                      '"$http_user_agent" "$http_x_forwarded_for"';
+
+    access_log  logs/access.log  main;
+
+    sendfile        on;
+    #tcp_nopush     on;
+
+    #keepalive_timeout  0;
+    keepalive_timeout  65;
+
+    #gzip  on;
+
+	types_hash_max_size 2048;
+	server_names_hash_bucket_size 64;
+
+    server {
+        listen       80;
+        server_name  localhost;
+
+		# tdtinyurl
+		location / {
+			root                                html;
+			index                               index.html index.htm;
+			tdtinyurl                           on;
+			tdtinyurl_work_mode                 "lr"; # lr is 1) Local DBM 2) Redis , rl = 1) Redis 2) Local
+			tdtinyurl_dbm_path                  "/usr/local/data/tdtinyurl/tdtinyurl_kcdb.kch";
+			tdtinyurl_redis_connnect_mode       uds ; # tcp or uds, recommended uds
+			tdtinyurl_redis_uds_path            /tmp/redis.sock;
+			tdtinyurl_redis_ip_addr             "127.0.0.1";
+			tdtinyurl_redis_port                "6379";
+			tdtinyurl_sqlite3_with_mode			on;
+			tdtinyurl_sqlite3_db_path			/usr/local/data/tdtinyurl/tdtinyurl.db;
+		}
+
+        location ~ \.html$ {
+            root           html;
+            include        fastcgi.conf;
+            fastcgi_pass   127.0.0.1:9000;
+            fastcgi_index  index.html;
+            fastcgi_param  SCRIPT_FILENAME  $document_root$fastcgi_script_name;
+            include        fastcgi_params;
+
+			fastcgi_param  tdtinyurl_work_mode  "lr";
+			fastcgi_param  tdtinyurl_dbm_path "/usr/local/data/tdtinyurl/tdtinyurl_kcdb.kch";
+        }
+
+
+		# tdtinyurl raise below codes
+		error_page   502 503 403 406  /fail.html;
+		error_page   404 /errpage/not.html;
+		error_page   500 /errpage/fail.html;
+		error_page   504 /errpage/timeout.html;
+		location = /errpage/not.html { root   html; }
+		location = /errpage/fail.html { root   html; }
+		location = /errpage/timeout.html { root   html; }
+    }
+}

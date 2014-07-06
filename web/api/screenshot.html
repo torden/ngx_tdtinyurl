@@ -1,0 +1,63 @@
+<?php
+/**
+ * Torden TinyURL
+ *
+ * @license : GPLv3, http://www.gnu.org/licenses/gpl.html
+ * @author : torden <https://github.com/torden/>
+ */
+include '../lib/define.html';
+include '../lib/func.html';
+
+//request
+$aReq = array();
+$aReq['tinyurl'] = filter_input(INPUT_GET, 'tinyurl');
+
+//connect to redis server.
+set_connect_redis();
+
+//get original url from redis
+$sURL = get_original_url_from_redis($aReq['tinyurl']);
+
+//screen shot image file path
+$sSavedPngFilePath = SCREEN_SHOT_PATH.'/'.$aReq['tinyurl'] .'.png';
+
+//phantomjs workable js file path
+$sJSTmpFilePath  = '/tmp/'.$aReq['tinyurl'] .'.js';
+
+$sURL = $oRedis->hGet($aReq['tinyurl'], 'url');
+if(NULL == $sURL or 1 > strlen($sURL)) {
+	set_error('not found tinyurl('.$aReq['tinyurl'].')');
+}
+
+//check eixsts screenshot file
+if(false == file_exists($sSavedPngFilePath)) {
+
+	//make a screenshot.js
+	$sTpl = <<<JS
+var page = require('webpage').create();
+page.open('{$sURL}', function() {
+page.render('{$sSavedPngFilePath}');
+phantom.exit();
+});
+JS;
+
+	//js file save to $sJSTmpFilePath
+	@file_put_contents($sJSTmpFilePath, $sTpl);
+	@exec(PHANTOMJS_BIN_PATH .'  '. $sJSTmpFilePath);
+	@unlink($sJSTmpFilePath);
+}
+
+
+//read screenshot image file
+if(false == file_exists($sSavedPngFilePath) || 582 == filesize($sSavedPngFilePath)) {
+    $sSavedPngFilePath = '../img/notcon.png';
+}
+
+//header
+@header('Content-Type: image/png', true);
+@header('Content-Length: ' . filesize($sSavedPngFilePath), true);
+
+$oFp = fopen($sSavedPngFilePath, 'rb');
+fpassthru($oFp);
+flush();
+?>

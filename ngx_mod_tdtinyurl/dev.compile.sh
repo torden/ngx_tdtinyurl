@@ -1,12 +1,14 @@
 #!/bin/sh
 sync
-cd /root/SRC/nginx-1.5.7
+killall -9 nginx
+rm -rf /usr/local/nginx/sbin/nginx
+cd /root/SRC/nginx-1.*
 rm -rf objs/ngx_modules.o objs/addon/mod_tdtinyurl/ngx_http_tdtinyurl_module.o
 rm -rf objs/nginx
-cc -c -pipe  -O -W -Wall -Wpointer-arith -Wno-unused-parameter -Werror -g   -I src/core -I src/event -I src/event/modules -I src/os/unix -I -I -I /usr/local/hiredis/include/hiredis/ -I -I -I /usr/local/kyotocabinet/include/ -I objs -I src/http -I src/http/modules -I src/mail \
+cc -c -pipe  -O -W -Wall -Wpointer-arith -Wno-unused-parameter -Werror -g   -I src/core -I src/event -I src/event/modules -I src/os/unix -I -I -I /usr/local/hiredis/include/hiredis/ -I -I -I /usr/local/kyotocabinet/include/ -I -I -I /usr/local/sqlite3/include/ -I objs -I src/http -I src/http/modules -I src/mail \
                 -o objs/addon/ngx_mod_tdtinyurl/ngx_http_tdtinyurl_module.o \
-                /root/BITBUCKET/tdtinyurl/ngx_mod_tdtinyurl/ngx_http_tdtinyurl_module.c
-cc -c -pipe  -O -W -Wall -Wpointer-arith -Wno-unused-parameter -Werror -g  -I src/core -I src/event -I src/event/modules -I src/os/unix -I -I -I /usr/local/hiredis/include/hiredis/ -I -I -I /usr/local/kyotocabinet/include/ -I objs \
+                /root/final_computer_socience_project/ngx_mod_tdtinyurl/ngx_http_tdtinyurl_module.c
+cc -c -pipe  -O -W -Wall -Wpointer-arith -Wno-unused-parameter -Werror -g  -I src/core -I src/event -I src/event/modules -I src/os/unix -I -I -I /usr/local/hiredis/include/hiredis/ -I -I -I /usr/local/kyotocabinet/include/ -I -I -I /usr/local/sqlite3/include/ -I objs \
                 -o objs/ngx_modules.o \
                 objs/ngx_modules.c
 cc -o objs/nginx \
@@ -119,12 +121,12 @@ cc -o objs/nginx \
         objs/src/http/modules/ngx_http_upstream_keepalive_module.o \
         objs/addon/ngx_mod_tdtinyurl/ngx_http_tdtinyurl_module.o \
         objs/ngx_modules.o \
-        -lpthread -lcrypt -L /usr/local/hiredis/lib/ -L /usr/local/kyotocabinet/lib/ -lkyotocabinet -lhiredis -lcurl -lz -lm -lpcre -lcrypto -lcrypto -lz
-
+        -lpthread -lcrypt -L /usr/local/hiredis/lib/ -L /usr/local/kyotocabinet/lib/ -L /usr/local/sqlite3/lib/ -lkyotocabinet -lhiredis -lcurl -lz -lm -lsqlite3 -lpcre -lcrypto -lcrypto -lz
 
 gmake
 gmake install
 killall nginx
 sync
+echo "" > /usr/local/nginx/logs/error.log 
 /usr/local/nginx/sbin/nginx
 tail -f /usr/local/nginx/logs/error.log 
