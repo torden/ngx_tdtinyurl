@@ -86,7 +86,7 @@ A Simple TinyURL Full Stack? Open Source, Including Nginx Module, PHP Extendtion
 |regdate|datetime|default current_timestamp|
 |FOREIGN KEY(tinyurl) REFERENCES TINYURL(tinyurl)||||
 
-# Installration 
+# Installation
 
 * Prepared RPM packages
 * Required : zip, pcre , python , jdk , valgrind , openssl
@@ -352,7 +352,7 @@ tdtinyurl_set_rid : 1
 tdtinyurl_get_rid : 1386096535
 ```
 
-# api information
+# API Information
 
 ## tdtinyurl_set_url
 
@@ -410,3 +410,5 @@ print 'tdtinyurl_get_rid : '. $sRid ."\n";
 ?>
 ```
 
+---
+moved from bitbucket.org
