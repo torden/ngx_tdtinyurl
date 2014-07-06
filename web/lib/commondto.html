@@ -1,0 +1,48 @@
+<?php
+/**
+ * Torden TinyURL
+ *
+ * @license : GPLv3, http://www.gnu.org/licenses/gpl.html
+ * @author : torden <https://github.com/torden/>
+ */
+
+class CommonDTO {
+
+	private $mSingleToneVal;	
+
+	public function __construct() {
+
+		$this->mSingleToneVal = array();
+	}
+
+	public function __destruct() {
+
+		$this->mSingleToneVal = null;
+		unset($mSingleToneVal);
+	}
+
+	public function __call($sCallName, $mArgs) {
+
+		//suports : set get
+		$sMethodPrefix = strtolower(substr($sCallName,0,3));
+		switch($sMethodPrefix) {
+			case 'set':
+				$sKeyName = strtolower(substr($sCallName,3));
+				$this->mSingleToneVal[$sKeyName] = $mArgs;
+				return $mArgs;
+
+			case 'get':
+				$sKeyName = strtolower(substr($sCallName,3));
+				if(true == array_key_exists($sKeyName, $this->mSingleToneVal)) {
+					return $this->mSingleToneVal[$sKeyName];
+				} else {
+					return NULL;
+				}
+				break;
+			default:
+				throw new Exception('Not Support Method');
+				break;
+		}
+    }
+}
+?>

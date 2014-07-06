@@ -1,0 +1,256 @@
+<?php
+/**
+ * Torden TinyURL
+ *
+ * @license : GPLv3, http://www.gnu.org/licenses/gpl.html
+ * @author : torden <https://github.com/torden/>
+ */
+include_once 'lib/define.html';
+include_once 'lib/func.html';
+include_once 'lib/commondto.html';
+include_once 'lib/pav.html';
+
+//GET a page paramter
+$nPage = filter_input(INPUT_GET, 'page', FILTER_SANITIZE_NUMBER_INT);
+$nPage = (1 > $nPage) ? 1 : $nPage;
+
+//GET sqlite3 db path in php.ini
+$oDB = set_connect_sqlite3();
+
+//connect to redis server.
+set_connect_redis();
+
+
+//get total count of sqlite3 db
+$oResultTotalCnt = get_sqlite3_result('SELECT count(*) as cnt FROM TDTINYURL');
+$nTotalCount = $oResultTotalCnt['cnt'];
+
+//get data from sqlite3 db
+$sSQL = 'SELECT 
+			rid,tinyurl,longurl,time,secure,hits,
+			strftime("%Y/%m/%d %H.%M.%S", regdate) as regdate, 
+			strftime("%s", regdate) as regtime 
+
+		FROM TDTINYURL 
+		ORDER BY regdate DESC 
+		LIMIT '. PAGELIMIT . ' OFFSET '. (PAGELIMIT * ($nPage-1));		
+$oResult = $oDB->query($sSQL);
+
+$oPageNav = new pageNavigation($oResultTotalCnt['cnt'], PAGELIMIT, $nPage);
+
+?>
+<!doctype html>
+<!--[if lt IE 7]><html class="no-js lt-ie9 lt-ie8 lt-ie7" lang="en"> <![endif]-->
+<!--[if IE 7]><html class="no-js lt-ie9 lt-ie8" lang="en"> <![endif]-->
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en"> <![endif]-->
+<!--[if gt IE 8]><!--><html class="no-js" lang="en"> <!--<![endif]-->
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="/css/bootstrap.min.css" rel="stylesheet">
+<link href="/css/style.css" rel="stylesheet">
+<link href="/css/themes/pace-theme-center-circle.css" rel="stylesheet">
+<!-- HTML5 shim, for IE6-8 support of HTML5 elements -->
+<!--[if lt IE 9]>
+<script src="js/html5shiv.js"></script>
+<![endif]-->
+<link rel="shortcut icon" href="/img/favicon.png">
+<script type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+<script type="text/javascript" src="/js/jquery-ui-1.10.4.min.js"></script>
+<script type="text/javascript" src="//netdna.bootstrapcdn.com/bootstrap/3.1.1/js/bootstrap.min.js"></script>
+<script type="text/javascript" src="/js/bootstrap-tooltip.js"></script>
+<script type="text/javascript" src="/js/scripts.js"></script>
+<script type="text/javascript" src="/js/pace.min.js"></script>
+</head>
+
+<body>
+<br />
+<div class="container">
+
+	<div class="row clearfix">
+		<div class="col-md-12 column">
+
+			<div class="jumbotron well">
+				<h1>
+					<a href="/">Torden</a>
+				</h1>
+				<p>
+					TinyURL
+				</p>
+				<p>
+					<a class="btn btn-primary btn-large" href="https://bitbucket.org/H200803092/final_computer_socience_project" target="_blank">View on Bitbucket Repository</a>
+					<a class="btn btn-info btn-large" href="#" id="showinfo">View Enviroment</a>
+				</p>
+			</div>
+			<form class="form-inline" role="form">
+				<div class="form-group">
+					<input type="url" class="form-control urlInput" id="urlInput" placeholder="Enter URL" />
+				</div>
+				<div class="form-group">
+					<button type="button" class="btn btn-primary btn-lg urlInputSubmit" id="urlSubmit">Submit</button></span>
+				</div>
+				<p></p>
+				<div class="form-group"> <div class="checkbox"> <label> <input id="lifetime" type="checkbox" checked> LifeTime OR </label> </div> </div>
+				<div class="form-group"> <input type="url" class="form-control" id="expiretime" placeholder="Enter ExpireTime" /> </div>
+				<div class="form-group"> <div class="checkbox"> <label> <input id="secure" type="checkbox"> fetching webpage mode</label> </div> </div>
+				<p></p>
+			</form>	
+			<div id="alert" class="alert alert-success alert-dismissable displayHidden alertPanel">
+				 <button type="button" class="close" data-dismiss="alert" aria-hidden="true">X</button>
+				<h4>
+					Alert!
+				</h4> <strong>Warning!&nbsp;&nbsp;</strong><span id="alertMsg">Wrong URL.</span>
+			</div>
+			<blockquote>
+				<p>Total TinyURL : <?php echo number_format($nTotalCount); ?></p>
+				<small>Developer : <cite>torden</cite></small>
+			</blockquote>
+			<table class="table">
+				<thead>
+					<tr>
+						<th>
+							ID
+						</th>
+
+						<th>
+							Tiny URL
+						</th>
+						<th>
+							Mode
+						</th>
+                        <th>
+							Expire
+						</th>
+
+						<th>
+							Original URL
+						</th>
+						<th>
+							Hits
+						</th>
+
+						<th>
+							RegDate
+						</th>
+						<th>
+							Tool
+						</th>
+
+					</tr>
+				</thead>
+				<tbody>
+
+
+<?php
+//Loop
+while($mRow = $oResult->fetchArray()) {
+
+	//generate a link url
+	$sTinyURL = 'http://' . $_SERVER['HTTP_HOST'] .'/'. $mRow['tinyurl'];
+	if(LONGURL_LIMIT > mb_strlen($mRow['longurl'])) {
+		$sDisplayLongUrl = $mRow['longurl'];
+	} else {
+		$sDisplayLongUrl = mb_substr($mRow['longurl'],0,LONGURL_LIMIT);
+		$sDisplayLongUrl .= '...';
+	}
+
+	//original long url
+	$sLongURL = $mRow['longurl'];
+
+	//expire 
+    $sLifeTime = '<span class="glyphicon glyphicon-minus"></span>';
+    if(0 == $mRow['time']) {
+        $sLifeTime = '<span class="glyphicon glyphicon-ok"></span>';
+    } else {
+
+        if(time() > ($mRow['regtime'] + $mRow['time'])) {
+            $sLifeTime = '<span class="glyphicon glyphicon-remove"></span>';
+        }
+
+    }
+?>
+					<tr>
+
+						<td>
+							<?php echo $mRow['rid']; ?>
+						</td>
+						<td>
+							<a href="<?php echo $sTinyURL; ?>" target="_blank"><?php echo $mRow['tinyurl']; ?></a>
+						</td>
+						<td>
+							<?php echo (1 == $mRow['secure']) ? '<span class=\'glyphicon glyphicon-log-in\'></span>&nbsp;Fetch' : '<span class=\'glyphicon glyphicon-log-out\'></span>&nbsp;Redirect'; ?>
+						</td>
+                        <td>
+                            <?php echo $sLifeTime; ?>
+                        </td>
+
+						<td>
+						<a href="#" data-toggle="tooltip" title="<?php echo $mRow['url']; ?>" data-placement="bottom" data-original-title="Another one here too"><?php echo $sDisplayLongUrl; ?></a>
+
+						</td>
+
+						<td>
+							<?php echo (0 < $mRow['hits']) ? number_format($mRow['hits']) : '-'; ?>
+						</td>
+						<td>
+							<?php echo $mRow['regdate']; ?>
+						</td>
+						<td>
+							<button type="button" id="screenshot" value="<?php echo $mRow['tinyurl']; ?>" class="btn btn-lg btn-info">Detail</button>
+						</td>
+
+					</tr>
+<?php
+}
+?>
+				</tbody>
+			</table>
+		<ul class="pagination">
+<?php
+if ($oPageNav->noOfPages > 1) {
+     
+    if ($oPageNav->previousStartItem != -1) {
+		print '<li><a href="?page="'. $oPageNav->previousStartItem .'">Prev</a>';
+    }
+     
+    foreach ( $oPageNav->pages as $page ) {
+
+        if ($page["pageno"] == -1) {
+			print '<li><a href="#">.</a></li>';
+        } elseif ($page['pageno'] == $oPageNav->currPage) {
+			print '<li><a href="?page='.$page['pageno'].'">'.$page['pageno'].'</a></li>';
+        } else {
+			print '<li'. (($nPage == $page['pageno']) ? ' class="active"':'').'><a href="?page='.$page['pageno'].'">'.$page['pageno'].'</a></li>';
+        }
+    }
+     
+    if ($oPageNav->nextStartItem != -1) {
+		print '<li><a href="?page="'. $oPageNav->nextStartItem.'">Next</a>';
+    }
+}
+?>
+		</ul>
+		</div>
+	</div>
+</div>
+<div id="actionModal" class="modal fade">
+  <div class="modal-dialog">
+    <div class="modal-content" id="actionModalContent">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+        <h4 id="actionModalTitle" class="modal-title">Modal title</h4>
+      </div>
+      <div class="modal-body">
+        <p id="actionModalMsg">One fine body&hellip;</p>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="tooltip top"><div class="tooltip-inner"></div><div class="tooltip-arrow"></div></div>
+</body>
+</html>
+<?php
+set_close_redis();
+set_close_sqlite3();
+?>

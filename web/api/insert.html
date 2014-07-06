@@ -1,0 +1,31 @@
+<?php
+/**
+ * Torden TinyURL
+ *
+ * @license : GPLv3, http://www.gnu.org/licenses/gpl.html
+ * @author : torden <https://github.com/torden/>
+ */
+ini_set('display_errors', false);
+
+$aReq = array();
+$aReq['sUrl'] = trim(filter_input(INPUT_POST, 'url', FILTER_SANITIZE_URL));
+$aReq['nLifeTime'] = trim(filter_input(INPUT_POST, 'lifetime', FILTER_SANITIZE_NUMBER_INT));
+$aReq['nExpireTime'] = trim(filter_input(INPUT_POST, 'expiretime', FILTER_SANITIZE_NUMBER_INT));
+$aReq['nSecure'] = trim(filter_input(INPUT_POST, 'secure', FILTER_SANITIZE_NUMBER_INT));
+
+if(false == $aReq['sUrl'] or 1 > strlen($aReq['sUrl'])) {
+	print '0';
+	exit;
+}
+
+//call PHP extention api
+$nActionMode = (1 == $aReq['nSecure']) ? TDTINYURL_MODE_SECUER_TUNNELING : TDTINYURL_MODE_DEFAULT_REDIRECTION;
+$nSetExpireTime = (0 == $aReq['nLifeTime']) ? 0 : $aReq['nExpireTime'];
+$sTinyURL = tdtinyurl_set_url($aReq['sUrl'], $nActionMode, $nSetExpireTime);
+
+if(false == $sTinyURL and 1 > strlen($sTinyURL)) {
+	print '0';
+} else {
+	print '1';
+}
+?>

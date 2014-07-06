@@ -1,0 +1,221 @@
+<?php
+/**
+ * Torden TinyURL
+ *
+ * @license : GPLv3, http://www.gnu.org/licenses/gpl.html
+ * @author : torden <https://github.com/torden/>
+ */
+include_once 'lib/define.html';
+include_once 'lib/func.html';
+include_once 'lib/commondto.html';
+
+//Request
+$aReq = array();
+$aReq['tinyurl'] = trim(filter_input(INPUT_GET, 'tinyurl'));
+
+if(false == $aReq['tinyurl'] or 1 > strlen($aReq['tinyurl'])) {
+
+    set_error("Required tinyurl paramter, Missing tinyurl");
+}
+
+$aReq['HTTP_HOST'] = trim(filter_input(INPUT_SERVER, 'HTTP_HOST'));
+if(false == $aReq['HTTP_HOST'] or 1 > strlen($aReq['HTTP_HOST'])) {
+
+    set_error("Missing HTTP_HOST env in Server Enviroments");
+}
+
+//connect to sqlite3 db file
+set_connect_sqlite3();
+
+//get total count
+$oResultTotalCnt = get_sqlite3_result('SELECT count(*) as cnt FROM TDTINYURL_LOG ');
+$nTotalCount = $oResultTotalCnt['cnt'];
+
+//Stat. Variables
+$aStat = array();
+
+//stat - yesterday
+$sThis = mktime(0,0,0, date('m'), date('d'), date('Y'));
+$sYesterDay = date('Y-m-d',strtotime('-1 day', $sThis)); 
+
+$sSQL = 'SELECT count(*) as cnt FROM TDTINYURL_LOG 
+            WHERE tinyurl = "'.$aReq['tinyurl'].'" 
+            AND regdate BETWEEN "'.$sYesterDay.' 00:00:00" AND "'.$sYesterDay.' 24:59:59"';
+$mVal = get_sqlite3_result($sSQL);
+$aStat['yesterday'] = $mVal['cnt'];
+
+//stat - today
+$sSQL = 'SELECT count(*) as cnt FROM TDTINYURL_LOG 
+            WHERE tinyurl = "'.$aReq['tinyurl'].'" 
+            AND regdate BETWEEN "'.date('Y-m-d').' 00:00:00" AND "'.date('Y-m-d').' 24:59:59"';
+$mVal = get_sqlite3_result($sSQL);
+$aStat['today'] = $mVal['cnt'];
+
+//stat - last week
+$sSQL = 'SELECT count(*) as cnt FROM TDTINYURL_LOG 
+            WHERE tinyurl = "'.$aReq['tinyurl'].'" AND strftime("%W",regdate) = "'. ((date('W'))-2) .'"'; 
+$mVal = get_sqlite3_result($sSQL);
+$aStat['lastweek'] = $mVal['cnt'];
+
+//stat - week
+$sSQL = 'SELECT count(*) as cnt FROM TDTINYURL_LOG 
+            WHERE tinyurl = "'.$aReq['tinyurl'].'" AND strftime("%W",regdate) = "'. ((date('W'))-1) .'"'; 
+$mVal = get_sqlite3_result($sSQL);
+$aStat['week'] = $mVal['cnt'];
+
+//stat - last month
+$sThisMonth = mktime(0,0,0, date('m'), 1, date('Y'));
+$nLastMonth = date('Ym', strtotime('-1 month', $sThisMonth));
+$sSQL = 'SELECT count(*) as cnt FROM TDTINYURL_LOG 
+            WHERE tinyurl = "'.$aReq['tinyurl'].'" AND strftime("%Y%m") = "'. $nLastMonth .'"';
+$mVal = get_sqlite3_result($sSQL);
+$aStat['lastmonth'] = $mVal['cnt'];
+
+
+//stat - month
+$sSQL = 'SELECT count(*) as cnt FROM TDTINYURL_LOG 
+            WHERE tinyurl = "'.$aReq['tinyurl'].'" AND strftime("%Y%m") = "'. date('Ym') .'"';
+$mVal = get_sqlite3_result($sSQL);
+$aStat['month'] = $mVal['cnt'];
+
+//stat - year
+$sSQL = 'SELECT count(*) as cnt FROM TDTINYURL_LOG 
+            WHERE tinyurl = "'.$aReq['tinyurl'].'" AND strftime("%Y") = "'. date('Y') .'"';
+$mVal = get_sqlite3_result($sSQL);
+$aStat['year'] = $mVal['cnt'];
+
+
+//get data from sqlite3 db
+$sSQL = 'SELECT rid,tinyurl,longurl,time,secure,hits,regdate FROM TDTINYURL 
+            WHERE tinyurl = "'.$aReq['tinyurl'].'"';
+$mRows = get_sqlite3_result($sSQL);
+$sTinyURL = 'http://' . $aReq['HTTP_HOST'] .'/'. $mRows['tinyurl'];
+
+
+//Substring about LongUrl
+$cLognUrlLimit = 70;
+if($cLognUrlLimit > mb_strlen($mRows['longurl'])) {
+	$sDisplayLongUrl = $mRows['longurl'];
+} else {
+	$sDisplayLongUrl = mb_substr($mRows['longurl'],0,$cLognUrlLimit);
+	$sDisplayLongUrl .= '...';
+}	
+$sLongURL = $mRows['longurl'];
+
+
+?>
+<!doctype html>
+<!--[if lt IE 7]><html class="no-js lt-ie9 lt-ie8 lt-ie7" lang="en"> <![endif]-->
+<!--[if IE 7]><html class="no-js lt-ie9 lt-ie8" lang="en"> <![endif]-->
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en"> <![endif]-->
+<!--[if gt IE 8]><!--><html class="no-js" lang="en"> <!--<![endif]-->
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="/css/bootstrap.min.css" rel="stylesheet">
+<link href="/css/themes/pace-theme-center-circle.css" rel="stylesheet">
+<link href="/css/style.css" rel="stylesheet">
+<style> @media (min-width: 1200px) { .container { width: 1250px; } } </style>
+<!-- HTML5 shim, for IE6-8 support of HTML5 elements -->
+<!--[if lt IE 9]>
+<script src="js/html5shiv.js"></script>
+<![endif]-->
+<link rel="shortcut icon" href="/img/favicon.png">
+<script type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+<script type="text/javascript" src="/js/jquery-ui-1.10.4.min.js"></script>
+<script type="text/javascript" src="//netdna.bootstrapcdn.com/bootstrap/3.1.1/js/bootstrap.min.js"></script>
+<script type="text/javascript" src="/js/bootstrap-tooltip.js"></script>
+<script type="text/javascript" src="/js/scripts.js"></script>
+<script type="text/javascript" src="/js/qrcode.min.js"></script>
+<script type="text/javascript" src="/js/pace.min.js"></script>
+</head>
+<body>
+<div class="container">
+    <div class="row clearfix">
+        <div class="col-md-12 column">
+            <div class="row clearfix">
+                <div class="col-md-12 column">
+                    <ul class="breadcrumb">
+                        <li>
+                             <h1><a href="<?php echo $sLongURL; ?>" target="_blank"><?php echo $sDisplayLongUrl; ?></a></h1>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <div class="row clearfix">
+                <div class="col-md-6 column">
+                    <blockquote>
+                        <div class="row clearfix">
+                            <div class="col-md-4 column">
+                                <h1><?php echo number_format($mRows['hits']); ?></h1><p>Total</p>
+                            </div>
+                            </div>
+                            <div class="row clearfix">
+                                <div class="col-md-4 column">
+                                    <h2><?php echo number_format($aStat['yesterday']); ?></h2><p>YesterDay</p>
+                                </div>
+                                <div class="col-md-4 column">
+                                    <h2><?php echo number_format($aStat['today']); ?></h2><p>Today</p>
+                                </div>
+                            </div>
+                            <div class="row clearfix">
+                                <div class="col-md-4 column">
+                                    <h2><?php echo number_format($aStat['lastweek']); ?></h2><p>Last Week</p>
+                                </div>
+                                <div class="col-md-4 column">
+                                    <h2><?php echo number_format($aStat['week']); ?></h2><p>This Week</p>
+                                </div>
+                            </div>
+                            <div class="row clearfix">
+                                <div class="col-md-4 column">
+                                    <h2><?php echo number_format($aStat['lastmonth']); ?></h2><p>Last Month</p>
+                                </div>
+                                <div class="col-md-4 column">
+                                    <h2><?php echo number_format($aStat['month']); ?></h2><p>This Month</p>
+                                </div>
+                            </div>
+
+                    </blockquote>
+                </div>
+                <div class="col-md-6 column">
+                    <blockquote>
+                        <p><div id="qrcode"></div></p>
+                        <p><a href="<?php echo $sTinyURL; ?>" target="_blank"><?php echo $sTinyURL; ?></a></p>
+                        <p>스크린샷은 다소 시간이 소요됩니다.</p>
+                        <p>네트웍또는 방화벽사정에 의해 스크린샷이 나오지않을수 있습니다.</p>
+                    </blockquote>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row clearfix">
+        <div class="col-md-12 column">
+            <button type="button" id="closebtn" class="btn btn-success btn-block btn-lg">Close</button>
+            <hr />
+            <p align="center">
+            <a href="/api/screenshot.html?tinyurl=<?php echo filter_input(INPUT_GET, 'tinyurl'); ?>" target="_blank">
+            <img style="text-align:center; vertical-align:middle; max-width:1100px; image-rendering: -moz-crisp-edges; image-rendering: -o-crisp-edges; image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; -ms-interpolation-mode: nearest-neighbor;" src="/api/screenshot.html?tinyurl=<?php echo filter_input(INPUT_GET, 'tinyurl'); ?>">
+            </a>
+            </p>
+        </div>
+    </div>
+</div>
+<script type="text/javascript">
+$(document).ready(function(){
+    $("#closebtn").click(function(e) {
+        window.close();
+    });
+
+    new QRCode(
+            document.getElementById("qrcode"), 
+            {
+            text: "http://<?php echo $_SERVER['HTTP_HOST']; ?>/<?php echo filter_input(INPUT_GET, 'tinyurl'); ?>",
+            width: 230,
+            height: 230,
+            colorDark : "#000000",
+            colorLight : "#ffffff"}
+            );
+});
+</script>
+</html>
