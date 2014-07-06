@@ -225,7 +225,7 @@ Redis Version => 2.2.5
 
 ```bash
 cd /nginx-1.5.*
-./configure --prefix=/usr/local/nginx/ --with-debug --add-module=TDTINYURL_CLONE_PATH/ngx_mod_tdtinyurl/
+./configure --prefix=/usr/local/nginx/ --with-debug --add-module=CLONE_PATH/ngx_mod_tdtinyurl/
 gmake
 gmake install
 

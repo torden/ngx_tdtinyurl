@@ -1,5 +1,6 @@
 # Install Redis client library for python
-```
+
+```bash
 git clone https://github.com/andymccurdy/redis-py
 cd redis-py/
 python setup.py build
@@ -7,7 +8,8 @@ python setup.py install
 ```
     
 # Install KyotoCabinet client library for python
-```
+
+```bash
 wget http://fallabs.com/kyotocabinet/pythonlegacypkg/kyotocabinet-python-legacy-1.18.tar.gz
 tar xvzf kyotocabinet-python-legacy-1.18.tar.gz
 cd kyotocabinet-python-legacy-1.18

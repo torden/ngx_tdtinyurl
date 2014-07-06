@@ -1,5 +1,6 @@
 # Install Ruby
-```
+
+```bash
 wget http://cache.ruby-lang.org/pub/ruby/2.1/ruby-2.1.2.tar.gz
 tar xvzf ruby-2.1.2.tar.gz
 cd ruby-2.1.2
@@ -10,7 +11,8 @@ gmake install
 ```
 
 # Install Kyotocabinet for Ruby
-```
+
+```bash
 wget http://fallabs.com/kyotocabinet/rubypkg/kyotocabinet-ruby-1.32.tar.gz
 tar xvzf kyotocabinet-ruby-1.32.tar.gz
 cd kyotocabinet-ruby-1.32
@@ -43,6 +45,7 @@ gmake install
 ```
 
 # Install Redis-rb
-```
+
+```bash
 /usr/local/ruby/bin/gem install redis
 ```
