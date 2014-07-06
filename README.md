@@ -2,7 +2,7 @@
 
 ---
 
-A Simple TinyURL Full Stack? Open Source, Including Nginx Module, PHP Extendtion, Scripts.
+A Simple TinyURL Full Stack? Open Source, Including Nginx Module, PHP Extention , Scripts.
 
 # Requirement (Mandatory)
 
@@ -33,13 +33,13 @@ A Simple TinyURL Full Stack? Open Source, Including Nginx Module, PHP Extendtion
 
 * Support Convert Redis Data to KytoCabinet DBM file tools  (Java, Ruby, Python)
 * Support PHP 5.x Extension
-* Support nginx 1.x
+* Support Nginx 1.x
 
 # Data Structure 
 
 ## Redis
 
-* First, the ngx module doing find the tinyurl key in Redis
+* First, the ngx module doing find the TinyURL key in Redis
 * Primary Lookup Data Storage
 
 |Redis|
@@ -53,7 +53,7 @@ A Simple TinyURL Full Stack? Open Source, Including Nginx Module, PHP Extendtion
 
 ## Kyotocabinet DBM
 
-* If the ngx module can't find the tinyurl key in Redis OR connecting fail
+* If the ngx module can't find the TinyURL key in Redis OR connecting fail
 * Secondary Lookup Data Storage, For Failover
 
 |Kyotocabinet DBM|
@@ -219,7 +219,7 @@ Redis Support => enabled
 Redis Version => 2.2.5
 ```
 
-# Install tinyurl module with Nginx
+# Install TinyURL module with Nginx
 
 ## generally
 
@@ -291,9 +291,9 @@ http {
 
 * edit nginx.conf
 * error_log  logs/error.log debug;
-* restarting nginx
+* restarting Nginx
 
-# Install tinyurl php module
+# Install TinyURL PHP module
 
 ## generally
 
@@ -411,4 +411,5 @@ print 'tdtinyurl_get_rid : '. $sRid ."\n";
 ```
 
 ---
-moved from bitbucket.org
+
+Moved from bitbucket.org
