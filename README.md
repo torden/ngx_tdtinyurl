@@ -42,8 +42,8 @@ A Simple TinyURL Full Stack? Open Source, Including Nginx Module, PHP Extention 
 * First, the ngx module doing find the TinyURL key in Redis
 * Primary Lookup Data Storage
 
-|Redis|
-| ------------- | ------------- | ------------- |
+|Redis|||
+|---|---|---|
 |key|Tinyurl Key|tduqid generated a sequence number|
 |time|Expire Time|TIMESTAMP|
 |url|Long URL|Original URL|
@@ -56,8 +56,8 @@ A Simple TinyURL Full Stack? Open Source, Including Nginx Module, PHP Extention 
 * If the ngx module can't find the TinyURL key in Redis OR connecting fail
 * Secondary Lookup Data Storage, For Failover
 
-|Kyotocabinet DBM|
-| ------------- | ------------- | ------------- |
+|Kyotocabinet DBM|||
+|---|---|---|
 |key|Tinyurl Key|tduqid generated a sequence number|
 |url|Long URL|Original URL|
 |secure|Secure Mode|0 : Normal Redirection, 1 : Web Page Fetching and Rendering|
@@ -67,8 +67,8 @@ A Simple TinyURL Full Stack? Open Source, Including Nginx Module, PHP Extention 
 
 * Main Data Storage and Easy Build a TinyURL Web Interface
 
-|TDTINYURL|Main Data|
-| ------------- | ------------- | ------------- |
+|TDTINYURL|Main Data|||
+|---|---|---|
 |rid|INTEGER|PRIMARY KEY AUTOINCREMENT|
 |tinyurl|text|not null|
 |longurl|text|not null|
@@ -77,8 +77,8 @@ A Simple TinyURL Full Stack? Open Source, Including Nginx Module, PHP Extention 
 |hits|integer|not null|
 |regdate|datetime|default current_timestamp|
 
-|TDTINYURL_LOG|Logging|
-| ------------- | ------------- | ------------- |
+|TDTINYURL_LOG|Logging|||
+|---|---|---|
 |tinyurl|text|not null|
 |agent|text|not null|
 |ipaddr|text|not null|
