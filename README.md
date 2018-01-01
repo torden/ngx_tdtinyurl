@@ -67,7 +67,7 @@ A Simple TinyURL Full Stack? Open Source, Including Nginx Module, PHP Extention 
 
 * Main Data Storage and Easy Build a TinyURL Web Interface
 
-|TDTINYURL|Main Data|||
+|TDTINYURL|Main Data||
 |---|---|---|
 |rid|INTEGER|PRIMARY KEY AUTOINCREMENT|
 |tinyurl|text|not null|
@@ -77,7 +77,7 @@ A Simple TinyURL Full Stack? Open Source, Including Nginx Module, PHP Extention 
 |hits|integer|not null|
 |regdate|datetime|default current_timestamp|
 
-|TDTINYURL_LOG|Logging|||
+|TDTINYURL_LOG|Logging||
 |---|---|---|
 |tinyurl|text|not null|
 |agent|text|not null|
