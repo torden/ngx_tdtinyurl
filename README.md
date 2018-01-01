@@ -1,8 +1,7 @@
 # Just! a TidyURL Example
 
----
 
-A Simple TinyURL Full Stack? Open Source, Including Nginx Module, PHP Extention , Scripts.
+A Simple TinyURL! Open Source, Nginx Module, PHP Extention , Scripts.
 
 # Requirement (Mandatory)
 
